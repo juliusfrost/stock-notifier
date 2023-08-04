@@ -9,7 +9,9 @@ async def main():
 
 
 def run():
-    asyncio.run(main())
+    # https://github.com/Pycord-Development/pycord/issues/872#issuecomment-1111596201
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(main())
 
 
 if __name__ == "__main__":
