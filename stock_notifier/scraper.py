@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 
 from stock_notifier.product import Product, all_products
-from stock_notifier.interface.discord import notify
+from stock_notifier.interface import notify
 
 
 async def check(product: Product):
