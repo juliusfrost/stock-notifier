@@ -1,21 +1,9 @@
 import asyncio
-from collections import defaultdict
-from dataclasses import dataclass
-from typing import Coroutine, Dict
 
 import aiohttp
 
-
-@dataclass()
-class Product:
-    name: str
-    url: str
-    indicator: str
-    user_id: int
-    callback: Coroutine
-
-
-all_products: defaultdict[int, Dict[str, Product]] = defaultdict(dict)
+from stock_notifier.product import Product, all_products
+from stock_notifier.interface.discord import notify
 
 
 async def check(product: Product):
@@ -23,8 +11,8 @@ async def check(product: Product):
         async with session.get(product.url) as response:
             html = await response.text()
     if product.indicator in html:
-        await product.callback
-        user_products = all_products[product.user_id]
+        await notify(product)
+        user_products = all_products[product.discord_user_id]
         del user_products[product.name]
 
 
