@@ -1,9 +1,11 @@
+from typing import List
+
 import discord
 import validators
 from dotenv import dotenv_values
 
-from stock_notifier.logging import logger
-from stock_notifier.product import Product, all_products
+from stock_notifier import models
+from stock_notifier.logger import logger
 
 config = dotenv_values(".env")
 
@@ -31,9 +33,10 @@ async def dm(user: discord.User, message: str):
 
 
 @bot.slash_command(
-    name="register", description="Register a URL to check if a product is in stock."
+    name="register_product",
+    description="Register a URL to check if a product is in stock.",
 )
-async def register(
+async def register_product(
     ctx: discord.ApplicationContext,
     name: discord.Option(str, description="Name of the product for later reference."),
     url: discord.Option(str, description="URL to the product page."),
@@ -45,16 +48,79 @@ async def register(
     if not validators.url(url):
         await respond(ctx, f"URL provided isn't valid! URL: {url}")
         return
-    product = Product(name, url, indicator, ctx.user.id)
-    all_products[product.discord_user_id][product.name] = product
-    await respond(ctx, f"Successfully registered product: {name}")
+    product = await models.add_product(
+        models.global_async_session, name, url, indicator
+    )
+    await respond(ctx, f"Successfully registered product: {product}")
 
 
-async def notify(product: Product):
+@bot.slash_command(name="sign_up", description="Sign up as a user.")
+async def register_user(ctx: discord.ApplicationContext):
+    user = await models.add_discord_user_if_not_exist(
+        models.global_async_session, ctx.user.name, ctx.user.id
+    )
+    await respond(ctx, f"Signed up as: {user}")
+
+
+async def get_unsubscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
+    return await models.get_unsubscribed_product_names(
+        models.global_async_session, ctx.interaction.user.id
+    )
+
+
+@bot.slash_command(
+    name="subscribe", description="Subscribe to receive notifications for a product."
+)
+async def subscribe(
+    ctx: discord.ApplicationContext,
+    name: discord.Option(
+        str,
+        autocomplete=get_unsubscribed_product_names,
+        description="Name of the product to remove.",
+    ),
+):
+    user = await models.add_discord_user_if_not_exist(
+        models.global_async_session, ctx.user.name, ctx.user.id
+    )
+    subscribed_products = await models.add_discord_subscription(
+        models.global_async_session, user.discord_id, name
+    )
+    for product in subscribed_products:
+        await ctx.respond(f"Subscribed to product: {product}")
+
+
+async def get_subscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
+    return await models.get_subscribed_product_names(
+        models.global_async_session, ctx.interaction.user.id
+    )
+
+
+@bot.slash_command(
+    name="unsubscribe", description="Unsubscribe to remove notifications for a product."
+)
+async def unsubscribe(
+    ctx: discord.ApplicationContext,
+    name: discord.Option(
+        str,
+        autocomplete=get_unsubscribed_product_names,
+        description="Name of the product to remove.",
+    ),
+):
+    unsubbed_products = await models.remove_discord_subscription_all(
+        models.global_async_session, ctx.user.id, name
+    )
+    if len(unsubbed_products) == 0:
+        await respond(ctx, f"Couldn't find subscribed products with name {name}")
+        return
+    for p in unsubbed_products:
+        await respond(ctx, f"Unsubscribed from product: {p}")
+
+
+async def notify(discord_id: int, product: models.Product):
     try:
-        user = await bot.fetch_user(product.discord_user_id)
+        user = await bot.fetch_user(discord_id)
     except discord.NotFound:
-        logger.exception(f"Couldn't find discord user id: {product.discord_user_id}")
+        logger.exception(f"Couldn't find discord user id: {discord_id}")
         return
 
     try:
@@ -62,29 +128,33 @@ async def notify(product: Product):
     except discord.Forbidden:
         logger.exception(f"Don't have permission to message user: {user}")
 
+    removed_subscription = await models.remove_discord_subscription(
+        models.global_async_session, discord_id, product.id
+    )
+    if removed_subscription:
+        await dm(user, f"Removed subscription to: {product}")
 
-def get_user_product_names(ctx: discord.AutocompleteContext):
-    user_id = ctx.interaction.user.id
-    user_products = all_products[user_id]
-    options = list(user_products.keys())
-    return options
+
+async def get_subscribed_product_names(ctx: discord.AutocompleteContext):
+    return await models.get_product_names(models.global_async_session)
 
 
-@bot.slash_command(name="remove", description="Remove a registered product.")
-async def remove(
+@bot.slash_command(name="delete_product", description="Remove a registered product.")
+async def delete_product(
     ctx: discord.ApplicationContext,
     name: discord.Option(
         str,
-        autocomplete=get_user_product_names,
+        autocomplete=get_subscribed_product_names,
         description="Name of the product to remove.",
     ),
 ):
-    user_products = all_products[ctx.user.id]
-    if name in user_products:
-        del user_products[name]
-        await respond(ctx, f"Successfully removed product {name}")
-    else:
+    deleted_products = await models.delete_product(models.global_async_session, name)
+    if len(deleted_products) == 0:
         await respond(ctx, f"Couldn't find product {name}")
+        return
+
+    for product in deleted_products:
+        await respond(ctx, f"Successfully removed product: {product}")
 
 
 async def start_bot():
