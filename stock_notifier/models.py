@@ -72,9 +72,7 @@ async def delete_product(
     async with async_session() as session:
         async with session.begin():
             results = []
-            for product in await session.scalars(
-                select(Product).where(Product.name == name)
-            ):
+            for product in await session.scalars(select(Product).filter_by(name=name)):
                 assert isinstance(product, Product)
                 results.append(product)
                 await session.delete(product)
@@ -96,9 +94,7 @@ async def add_discord_user_if_not_exist(
 ) -> User:
     async with async_session() as session:
         async with session.begin():
-            user = await session.scalar(
-                select(User).where(User.discord_id == discord_id)
-            )
+            user = await session.scalar(select(User).filter_by(discord_id=discord_id))
             if not user:
                 user = User(name=name, discord_id=discord_id)
                 session.add(user)
@@ -111,9 +107,7 @@ async def add_discord_subscription(
     """Adds a discord subscription. Returns a list of successfully subscribed products."""
     async with async_session() as session:
         async with session.begin():
-            user = await session.scalar(
-                select(User).where(User.discord_id == discord_id)
-            )
+            user = await session.scalar(select(User).filter_by(discord_id=discord_id))
             assert isinstance(user, User)
             results = []
             for product in await session.scalars(
@@ -134,7 +128,7 @@ async def remove_discord_subscription(
         async with session.begin():
             user = await session.scalar(
                 select(User)
-                .where(User.discord_id == discord_id)
+                .filter_by(discord_id=discord_id)
                 .options(selectinload(User.products))
             )
             found = None
@@ -153,7 +147,7 @@ async def remove_discord_subscription_all(
         async with session.begin():
             user = await session.scalar(
                 select(User)
-                .where(User.discord_id == discord_id)
+                .filter_by(discord_id=discord_id)
                 .options(selectinload(User.products))
             )
             results = []
@@ -184,7 +178,7 @@ async def get_subscribed_product_names(
         results = []
         user = await session.scalar(
             select(User)
-            .where(User.discord_id == discord_id)
+            .filter_by(discord_id=discord_id)
             .options(selectinload(User.products))
         )
         for product in user.products:
@@ -197,7 +191,7 @@ async def get_unsubscribed_product_names(
 ) -> List[str]:
     """Get a unique list of unsubscribed product names. Returns all product names if no user exists."""
     async with async_session() as session:
-        user = await session.scalar(select(User).where(User.id == discord_id))
+        user = await session.scalar(select(User).filter_by(discord_id=discord_id))
         if user:
             results = []
             for product in await session.scalars(
