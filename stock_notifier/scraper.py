@@ -29,8 +29,6 @@ async def check(product: models.Product):
 
     if re.match(product.indicator, html, re.DOTALL):
         await notify(product)
-    else:
-        logger.info(f"No stock available for {product.name}")
 
 
 async def get_products():
