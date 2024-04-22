@@ -1,3 +1,4 @@
+import re
 from typing import List
 
 import discord
@@ -44,10 +45,13 @@ async def register_product(
         str,
         description="Text to search in the HTML to check if the product is in stock.",
     ),
+    regex: discord.Option(bool, default=False, description="Whether to interpret the indicator as a regular expression."),
 ):
     if not validators.url(url):
         await respond(ctx, f"URL provided isn't valid! URL: {url}")
         return
+    if not regex:
+        indicator = re.escape(indicator)
     product = await models.add_product(
         models.global_async_session, name, url, indicator
     )
