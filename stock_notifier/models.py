@@ -162,15 +162,15 @@ async def get_product_names() -> List[str]:
 
 async def get_subscribed_product_names(discord_id: int) -> List[str]:
     async with global_async_session() as session:
-        results = []
+        results = set()
         user = await session.scalar(
             select(User)
             .filter_by(discord_id=discord_id)
             .options(selectinload(User.products))
         )
         for product in user.products:
-            results.append(product.name)
-        return results
+            results.add(product.name)
+        return list(results)
 
 
 async def get_unsubscribed_product_names(discord_id: int) -> List[str]:

@@ -109,7 +109,7 @@ async def unsubscribe(
     ctx: discord.ApplicationContext,
     name: discord.Option(
         str,
-        autocomplete=get_unsubscribed_product_names,
+        autocomplete=get_subscribed_product_names,
         description="Name of the product to remove.",
     ),
 ):
@@ -140,7 +140,7 @@ async def notify(discord_id: int, product: models.Product):
         await dm(user, f"Removed subscription to: {product}")
 
 
-async def get_subscribed_product_names(ctx: discord.AutocompleteContext):
+async def get_product_names(ctx: discord.AutocompleteContext):
     return await models.get_product_names()
 
 
@@ -149,7 +149,7 @@ async def delete_product(
     ctx: discord.ApplicationContext,
     name: discord.Option(
         str,
-        autocomplete=get_subscribed_product_names,
+        autocomplete=get_product_names,
         description="Name of the product to remove.",
     ),
 ):
