@@ -93,7 +93,7 @@ async def subscribe(
     user = await models.add_discord_user_if_not_exist(ctx.user.name, ctx.user.id)
     subscribed_products = await models.add_discord_subscription(user.discord_id, name)
     for product in subscribed_products:
-        await ctx.respond(f"Subscribed to product: {product}")
+        await respond(ctx, f"Subscribed to product: {product}")
 
 
 async def get_subscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
