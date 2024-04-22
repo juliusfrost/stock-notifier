@@ -10,7 +10,6 @@ from stock_notifier.scraper import scraper_loop
 async def main():
     engine = create_async_engine(
         "sqlite+aiosqlite:///sqlite.db",
-        echo=True,
     )
     async_session = async_sessionmaker(engine, expire_on_commit=False)
     models.global_async_session = async_session
