@@ -138,16 +138,17 @@ async def remove_discord_subscription_all(
         async with session.begin():
             user = await session.scalar(
                 select(User)
-                .filter_by(discord_id=discord_id)
+                .where(User.discord_id == discord_id)
                 .options(selectinload(User.products))
             )
-            results = []
+            products_to_remove = []
             for product in user.products:
                 if product.name == product_name:
-                    user.products.remove(product)
-                    results.append(product)
+                    products_to_remove.append(product)
+            for product in products_to_remove:
+                user.products.remove(product)
             await session.flush()
-            return results
+            return products_to_remove
 
 
 async def get_product_names() -> List[str]:
