@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import aiohttp
 
@@ -11,7 +12,7 @@ async def check(product: models.Product):
         async with session.get(product.url) as response:
             html = await response.text()
 
-    if product.indicator in html:
+    if re.match(product.indicator, html, re.DOTALL):
         await notify(product)
 
 
