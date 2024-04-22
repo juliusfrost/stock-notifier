@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Table, select
+from sqlalchemy import Column, ForeignKey, Integer, String, Table, not_, select
 from sqlalchemy.ext.asyncio import AsyncAttrs, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -103,6 +103,7 @@ async def add_discord_subscription(discord_id: int, product_name: str) -> List[P
             for product in await session.scalars(
                 select(Product)
                 .where(Product.name == product_name)
+                .filter(not_(Product.subscribers.any(User.id == user.id)))
                 .options(selectinload(Product.subscribers))
             ):
                 assert isinstance(product, Product)
