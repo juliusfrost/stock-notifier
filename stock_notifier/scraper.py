@@ -27,7 +27,7 @@ async def check(product: models.Product):
 
     html = await asyncio.to_thread(get_html, product.url)
 
-    if re.match(product.indicator, html, re.DOTALL):
+    if re.search(product.indicator, html, re.DOTALL):
         await notify(product)
 
 
