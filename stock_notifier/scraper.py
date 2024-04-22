@@ -1,11 +1,17 @@
 import asyncio
 import re
+from collections import defaultdict
+from urllib.parse import urlparse
 
 import requests
 
-from stock_notifier import models
+from stock_notifier import config, models
 from stock_notifier.interface import notify
 from stock_notifier.logger import logger
+
+sleep_seconds_config = config.get("sleep_seconds", {})
+SLEEP_SAME_HOST = sleep_seconds_config.get("same_host", 1)
+SLEEP_GLOBAL = sleep_seconds_config.get("global", 10)
 
 
 def get_html(url):
@@ -31,14 +37,28 @@ async def get_products():
         return await session.scalars(models.select(models.Product))
 
 
+async def check_product_list(products: list[models.Product]):
+    for i, product in enumerate(products):
+        await check(product)
+        # sleep between checking products of the same host
+        if i < len(products) - 1:
+            await asyncio.sleep(SLEEP_SAME_HOST)
+
+
 async def check_products():
+    products = await get_products()
+    hosts = defaultdict(list)
+    for p in products:
+        o = urlparse(p.url)
+        hosts[o.hostname].append(p)
+
     tasks = [asyncio.create_task(check(product)) for product in await get_products()]
     await asyncio.gather(*tasks)
 
 
-async def scraper_loop(sleep_time=10):
+async def scraper_loop():
     while True:
         logger.info("Checking product stock...")
         await check_products()
-        logger.info(f"Sleeping for {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
+        logger.info(f"Sleeping for {SLEEP_GLOBAL} seconds...")
+        await asyncio.sleep(SLEEP_GLOBAL)
