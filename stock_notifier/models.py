@@ -56,20 +56,16 @@ class Product(Base):
         return f"Product(id={self.id!r}, name={self.name!r}, url={self.url!r}, indicator={self.indicator!r})"
 
 
-async def add_product(
-    async_session: async_sessionmaker[AsyncSession], name: str, url: str, indicator: str
-) -> Product:
-    async with async_session() as session:
+async def add_product(name: str, url: str, indicator: str) -> Product:
+    async with global_async_session() as session:
         async with session.begin():
             product = Product(name=name, url=url, indicator=indicator)
             session.add(product)
             return product
 
 
-async def delete_product(
-    async_session: async_sessionmaker[AsyncSession], name: str
-) -> List[Product]:
-    async with async_session() as session:
+async def delete_product(name: str) -> List[Product]:
+    async with global_async_session() as session:
         async with session.begin():
             results = []
             for product in await session.scalars(select(Product).filter_by(name=name)):
@@ -79,20 +75,16 @@ async def delete_product(
             return results
 
 
-async def add_discord_user(
-    async_session: async_sessionmaker[AsyncSession], name: str, discord_id: int
-) -> User:
-    async with async_session() as session:
+async def add_discord_user(name: str, discord_id: int) -> User:
+    async with global_async_session() as session:
         async with session.begin():
             user = User(name=name, discord_id=discord_id)
             session.add(user)
             return user
 
 
-async def add_discord_user_if_not_exist(
-    async_session: async_sessionmaker[AsyncSession], name: str, discord_id: int
-) -> User:
-    async with async_session() as session:
+async def add_discord_user_if_not_exist(name: str, discord_id: int) -> User:
+    async with global_async_session() as session:
         async with session.begin():
             user = await session.scalar(select(User).filter_by(discord_id=discord_id))
             if not user:
@@ -101,11 +93,9 @@ async def add_discord_user_if_not_exist(
             return user
 
 
-async def add_discord_subscription(
-    async_session: async_sessionmaker[AsyncSession], discord_id: int, product_name: str
-) -> List[Product]:
+async def add_discord_subscription(discord_id: int, product_name: str) -> List[Product]:
     """Adds a discord subscription. Returns a list of successfully subscribed products."""
-    async with async_session() as session:
+    async with global_async_session() as session:
         async with session.begin():
             user = await session.scalar(select(User).filter_by(discord_id=discord_id))
             assert isinstance(user, User)
@@ -122,9 +112,9 @@ async def add_discord_subscription(
 
 
 async def remove_discord_subscription(
-    async_session: async_sessionmaker[AsyncSession], discord_id: int, product_id: int
+    discord_id: int, product_id: int
 ) -> Optional[Product]:
-    async with async_session() as session:
+    async with global_async_session() as session:
         async with session.begin():
             user = await session.scalar(
                 select(User)
@@ -141,9 +131,9 @@ async def remove_discord_subscription(
 
 
 async def remove_discord_subscription_all(
-    async_session: async_sessionmaker[AsyncSession], discord_id: int, product_name: str
+    discord_id: int, product_name: str
 ) -> List[Product]:
-    async with async_session() as session:
+    async with global_async_session() as session:
         async with session.begin():
             user = await session.scalar(
                 select(User)
@@ -159,11 +149,9 @@ async def remove_discord_subscription_all(
             return results
 
 
-async def get_product_names(
-    async_session: async_sessionmaker[AsyncSession],
-) -> List[str]:
+async def get_product_names() -> List[str]:
     """Returns a unique set of product names."""
-    async with async_session() as session:
+    async with global_async_session() as session:
         results = []
         for product in await session.execute(select(Product.name)):
             assert isinstance(product.name, str)
@@ -171,10 +159,8 @@ async def get_product_names(
         return list(set(results))
 
 
-async def get_subscribed_product_names(
-    async_session: async_sessionmaker[AsyncSession], discord_id: int
-) -> List[str]:
-    async with async_session() as session:
+async def get_subscribed_product_names(discord_id: int) -> List[str]:
+    async with global_async_session() as session:
         results = []
         user = await session.scalar(
             select(User)
@@ -186,11 +172,9 @@ async def get_subscribed_product_names(
         return results
 
 
-async def get_unsubscribed_product_names(
-    async_session: async_sessionmaker[AsyncSession], discord_id: int
-) -> List[str]:
+async def get_unsubscribed_product_names(discord_id: int) -> List[str]:
     """Get a unique list of unsubscribed product names. Returns all product names if no user exists."""
-    async with async_session() as session:
+    async with global_async_session() as session:
         user = await session.scalar(select(User).filter_by(discord_id=discord_id))
         if user:
             results = []
@@ -201,4 +185,4 @@ async def get_unsubscribed_product_names(
             ):
                 results.append(product.name)
             return list(set(results))
-    return await get_product_names(async_session)
+    return await get_product_names()

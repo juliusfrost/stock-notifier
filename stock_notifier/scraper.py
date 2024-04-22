@@ -9,7 +9,9 @@ from stock_notifier.logger import logger
 
 
 async def check(product: models.Product):
-    logger.info(f'Checking {product.name} for indicator {product.indicator} at {product.url}')
+    logger.info(
+        f"Checking {product.name} for indicator {product.indicator} at {product.url}"
+    )
     async with aiohttp.ClientSession() as session:
         async with session.get(product.url) as response:
             html = await response.text()

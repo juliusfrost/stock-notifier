@@ -45,39 +45,38 @@ async def register_product(
         str,
         description="Text to search in the HTML to check if the product is in stock.",
     ),
-    regex: discord.Option(bool, default=False, description="Whether to interpret the indicator as a regular expression."),
+    regex: discord.Option(
+        bool,
+        default=False,
+        description="Whether to interpret the indicator as a regular expression.",
+    ),
 ):
     if not validators.url(url):
         await respond(ctx, f"URL provided isn't valid! URL: {url}")
         return
     if not regex:
         indicator = re.escape(indicator)
-    product = await models.add_product(
-        models.global_async_session, name, url, indicator
-    )
+    product = await models.add_product(name, url, indicator)
     await respond(ctx, f"Successfully registered product: {product}")
 
 
 @bot.slash_command(name="sign_up", description="Sign up as a user.")
 async def register_user(ctx: discord.ApplicationContext):
-    user = await models.add_discord_user_if_not_exist(
-        models.global_async_session, ctx.user.name, ctx.user.id
-    )
+    user = await models.add_discord_user_if_not_exist(ctx.user.name, ctx.user.id)
     await respond(ctx, f"Signed up as: {user}")
 
 
 @bot.slash_command(
-    name="list_products", description="List all products available to subscribe for in-stock notifications."
+    name="list_products",
+    description="List all products available to subscribe for in-stock notifications.",
 )
 async def list_products(ctx: discord.ApplicationContext):
-    product_names = await models.get_product_names(models.global_async_session)
+    product_names = await models.get_product_names()
     await respond(ctx, "Available products: " + str(product_names))
 
 
 async def get_unsubscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
-    return await models.get_unsubscribed_product_names(
-        models.global_async_session, ctx.interaction.user.id
-    )
+    return await models.get_unsubscribed_product_names(ctx.interaction.user.id)
 
 
 @bot.slash_command(
@@ -91,20 +90,14 @@ async def subscribe(
         description="Name of the product to remove.",
     ),
 ):
-    user = await models.add_discord_user_if_not_exist(
-        models.global_async_session, ctx.user.name, ctx.user.id
-    )
-    subscribed_products = await models.add_discord_subscription(
-        models.global_async_session, user.discord_id, name
-    )
+    user = await models.add_discord_user_if_not_exist(ctx.user.name, ctx.user.id)
+    subscribed_products = await models.add_discord_subscription(user.discord_id, name)
     for product in subscribed_products:
         await ctx.respond(f"Subscribed to product: {product}")
 
 
 async def get_subscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
-    return await models.get_subscribed_product_names(
-        models.global_async_session, ctx.interaction.user.id
-    )
+    return await models.get_subscribed_product_names(ctx.interaction.user.id)
 
 
 @bot.slash_command(
@@ -118,9 +111,7 @@ async def unsubscribe(
         description="Name of the product to remove.",
     ),
 ):
-    unsubbed_products = await models.remove_discord_subscription_all(
-        models.global_async_session, ctx.user.id, name
-    )
+    unsubbed_products = await models.remove_discord_subscription_all(ctx.user.id, name)
     if len(unsubbed_products) == 0:
         await respond(ctx, f"Couldn't find subscribed products with name {name}")
         return
@@ -141,14 +132,14 @@ async def notify(discord_id: int, product: models.Product):
         logger.exception(f"Don't have permission to message user: {user}")
 
     removed_subscription = await models.remove_discord_subscription(
-        models.global_async_session, discord_id, product.id
+        discord_id, product.id
     )
     if removed_subscription:
         await dm(user, f"Removed subscription to: {product}")
 
 
 async def get_subscribed_product_names(ctx: discord.AutocompleteContext):
-    return await models.get_product_names(models.global_async_session)
+    return await models.get_product_names()
 
 
 @bot.slash_command(name="delete_product", description="Remove a registered product.")
@@ -160,7 +151,7 @@ async def delete_product(
         description="Name of the product to remove.",
     ),
 ):
-    deleted_products = await models.delete_product(models.global_async_session, name)
+    deleted_products = await models.delete_product(name)
     if len(deleted_products) == 0:
         await respond(ctx, f"Couldn't find product {name}")
         return
