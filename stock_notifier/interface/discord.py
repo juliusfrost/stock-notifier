@@ -142,6 +142,24 @@ async def notify(discord_id: int, product: models.Product):
         await dm(user, f"Removed subscription to: {product}")
 
 
+@bot.slash_command(
+    name="test_notify", description="The bot notifies you with a direct message."
+)
+async def test_notify(ctx: discord.ApplicationContext):
+    try:
+        await dm(
+            ctx.author,
+            f"Hello {ctx.author.display_name}! "
+            f"I will message you again when any of your subscribed products are in stock!",
+        )
+        await respond(ctx, f"I sent a direct message to you. Please verify you got it.")
+    except discord.Forbidden:
+        await respond(
+            ctx,
+            f"I couldn't send a direct message. Please check your discord privacy settings.",
+        )
+
+
 async def get_product_names(ctx: discord.AutocompleteContext):
     return await models.get_product_names()
 
