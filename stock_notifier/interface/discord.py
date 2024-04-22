@@ -126,12 +126,14 @@ async def notify(discord_id: int, product: models.Product):
         user = await bot.fetch_user(discord_id)
     except discord.NotFound:
         logger.exception(f"Couldn't find discord user id: {discord_id}")
+        await models.remove_discord_subscription_all(discord_id)
         return
 
     try:
         await dm(user, f"Product {product.name} in stock! URL: {product.url}")
     except discord.Forbidden:
-        logger.exception(f"Don't have permission to message user: {user}")
+        logger.warning(f"Don't have permission to message user: {user}")
+        return
 
     removed_subscription = await models.remove_discord_subscription(
         discord_id, product.id
