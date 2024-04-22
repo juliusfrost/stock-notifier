@@ -1,5 +1,6 @@
 import asyncio
 import re
+import time
 from collections import defaultdict
 from urllib.parse import urlparse
 
@@ -58,7 +59,14 @@ async def check_products():
 
 async def scraper_loop():
     while True:
+        start_check_time = time.time()
         logger.info("Checking product stock...")
         await check_products()
-        logger.info(f"Sleeping for {SLEEP_GLOBAL} seconds...")
-        await asyncio.sleep(SLEEP_GLOBAL)
+        finish_check_time = time.time()
+        time_spent_checking = finish_check_time - start_check_time
+        logger.info(
+            f"Time spent checking stock: {round(time_spent_checking, 2)} seconds"
+        )
+        sleep_time = max(SLEEP_GLOBAL - time_spent_checking, 0)
+        logger.info(f"Sleeping for {round(sleep_time, 2)} seconds...")
+        await asyncio.sleep(sleep_time)
