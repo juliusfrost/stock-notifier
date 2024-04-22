@@ -53,7 +53,10 @@ async def check_products():
         o = urlparse(p.url)
         hosts[o.hostname].append(p)
 
-    tasks = [asyncio.create_task(check(product)) for product in await get_products()]
+    tasks = []
+    for products in hosts.values():
+        tasks.append(asyncio.create_task(check_product_list(products)))
+
     await asyncio.gather(*tasks)
 
 
