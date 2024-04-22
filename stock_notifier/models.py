@@ -177,13 +177,9 @@ async def get_unsubscribed_product_names(discord_id: int) -> List[str]:
     """Get a unique list of unsubscribed product names. Returns all product names if no user exists."""
     async with global_async_session() as session:
         user = await session.scalar(select(User).filter_by(discord_id=discord_id))
-        if user:
-            results = []
-            for product in await session.scalars(
-                select(Product).join(
-                    Product.subscribers.and_(User.discord_id != discord_id)
-                )
-            ):
-                results.append(product.name)
-            return list(set(results))
-    return await get_product_names()
+        results = set()
+        for product in await session.scalars(
+            select(Product).filter(not_(Product.subscribers.any(User.id == user.id)))
+        ):
+            results.add(product.name)
+        return list(results)
