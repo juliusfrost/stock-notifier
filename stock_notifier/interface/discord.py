@@ -62,6 +62,14 @@ async def register_user(ctx: discord.ApplicationContext):
     await respond(ctx, f"Signed up as: {user}")
 
 
+@bot.slash_command(
+    name="list_products", description="List all products available to subscribe for in-stock notifications."
+)
+async def list_products(ctx: discord.ApplicationContext):
+    product_names = await models.get_product_names(models.global_async_session)
+    await respond(ctx, "Available products: " + str(product_names))
+
+
 async def get_unsubscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
     return await models.get_unsubscribed_product_names(
         models.global_async_session, ctx.interaction.user.id
