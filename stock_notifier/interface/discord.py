@@ -70,9 +70,23 @@ async def register_user(ctx: discord.ApplicationContext):
     name="list_products",
     description="List all products available to subscribe for in-stock notifications.",
 )
-async def list_products(ctx: discord.ApplicationContext):
-    product_names = await models.get_product_names()
-    await respond(ctx, "Available products: " + str(product_names))
+async def list_products(
+    ctx: discord.ApplicationContext,
+    verbose: discord.Option(
+        bool,
+        default=False,
+        description="Whether to print a verbose output.",
+    ),
+):
+    if verbose:
+        message = "Available products:"
+        for product in await models.get_products():
+            message += f"\n{product}"
+    else:
+        message = "Available products:"
+        for name in await models.get_product_names():
+            message += f"\n{name}"
+    await respond(ctx, message)
 
 
 async def get_unsubscribed_product_names(ctx: discord.AutocompleteContext) -> List[str]:
@@ -167,15 +181,36 @@ async def get_product_names(ctx: discord.AutocompleteContext):
 @bot.slash_command(name="delete_product", description="Remove a registered product.")
 async def delete_product(
     ctx: discord.ApplicationContext,
+    id: discord.Option(
+        int,
+        default=-1,
+        min_value=1,
+        description="Product id of the product to remove.",
+    ),
     name: discord.Option(
         str,
+        default="",
         autocomplete=get_product_names,
-        description="Name of the product to remove.",
+        description="Product name of the product to remove.",
+    ),
+    url: discord.Option(str, default="", description="Product URL to remove."),
+    indicator: discord.Option(
+        str, default="", description="Product indicator to remove."
     ),
 ):
-    deleted_products = await models.delete_product(name)
+    kwargs = {}
+    if id > -1:
+        kwargs["id"] = id
+    if name != "":
+        kwargs["name"] = name
+    if url != "":
+        kwargs["url"] = url
+    if indicator != "":
+        kwargs["indicator"] = indicator
+
+    deleted_products = await models.delete_product(**kwargs)
     if len(deleted_products) == 0:
-        await respond(ctx, f"Couldn't find product {name}")
+        await respond(ctx, f"Couldn't find product with arguments: {kwargs}")
         return
 
     for product in deleted_products:

@@ -64,11 +64,11 @@ async def add_product(name: str, url: str, indicator: str) -> Product:
             return product
 
 
-async def delete_product(name: str) -> List[Product]:
+async def delete_product(**kwargs: dict) -> List[Product]:
     async with global_async_session() as session:
         async with session.begin():
             results = []
-            for product in await session.scalars(select(Product).filter_by(name=name)):
+            for product in await session.scalars(select(Product).filter_by(**kwargs)):
                 assert isinstance(product, Product)
                 results.append(product)
                 await session.delete(product)
@@ -161,6 +161,15 @@ async def get_product_names() -> List[str]:
         return list(set(results))
 
 
+async def get_products() -> List[Product]:
+    """Returns a unique set of product names."""
+    async with global_async_session() as session:
+        results = []
+        for product in await session.scalars(select(Product)):
+            results.append(product)
+        return list(results)
+
+
 async def get_subscribed_product_names(discord_id: int) -> List[str]:
     async with global_async_session() as session:
         results = set()
@@ -178,6 +187,8 @@ async def get_unsubscribed_product_names(discord_id: int) -> List[str]:
     """Get a unique list of unsubscribed product names. Returns all product names if no user exists."""
     async with global_async_session() as session:
         user = await session.scalar(select(User).filter_by(discord_id=discord_id))
+        if user is None:
+            return await get_product_names()
         results = set()
         for product in await session.scalars(
             select(Product).filter(not_(Product.subscribers.any(User.id == user.id)))
