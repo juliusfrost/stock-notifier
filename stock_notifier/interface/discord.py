@@ -93,19 +93,44 @@ async def get_unsubscribed_product_names(ctx: discord.AutocompleteContext) -> Li
     return await models.get_unsubscribed_product_names(ctx.interaction.user.id)
 
 
+def filter_kwargs(kwargs: dict):
+    del_keys = []
+    for key, val in kwargs.items():
+        if isinstance(val, str) and val == "":
+            del_keys.append(key)
+        elif isinstance(val, int) and val < 1:
+            del_keys.append(key)
+    for key in del_keys:
+        del kwargs[key]
+
+
 @bot.slash_command(
     name="subscribe", description="Subscribe to receive notifications for a product."
 )
 async def subscribe(
     ctx: discord.ApplicationContext,
+    id: discord.Option(
+        int,
+        default=-1,
+        min_value=1,
+        description="Product id.",
+    ),
     name: discord.Option(
         str,
+        default="",
         autocomplete=get_unsubscribed_product_names,
-        description="Name of the product to remove.",
+        description="Product name.",
     ),
+    url: discord.Option(str, default="", description="Product URL."),
+    indicator: discord.Option(str, default="", description="Product indicator."),
 ):
+    kwargs = dict(id=id, name=name, url=url, indicator=indicator)
+    filter_kwargs(kwargs)
+
     user = await models.add_discord_user_if_not_exist(ctx.user.name, ctx.user.id)
-    subscribed_products = await models.add_discord_subscription(user.discord_id, name)
+    subscribed_products = await models.add_discord_subscription(
+        user.discord_id, **kwargs
+    )
     for product in subscribed_products:
         await respond(ctx, f"Subscribed to product: {product}")
     if len(subscribed_products) == 0:
@@ -121,13 +146,25 @@ async def get_subscribed_product_names(ctx: discord.AutocompleteContext) -> List
 )
 async def unsubscribe(
     ctx: discord.ApplicationContext,
+    id: discord.Option(
+        int,
+        default=-1,
+        min_value=1,
+        description="Product id.",
+    ),
     name: discord.Option(
         str,
+        default="",
         autocomplete=get_subscribed_product_names,
-        description="Name of the product to remove.",
+        description="Product name.",
     ),
+    url: discord.Option(str, default="", description="Product URL."),
+    indicator: discord.Option(str, default="", description="Product indicator."),
 ):
-    unsubbed_products = await models.remove_discord_subscription_all(ctx.user.id, name)
+    kwargs = dict(id=id, name=name, url=url, indicator=indicator)
+    filter_kwargs(kwargs)
+
+    unsubbed_products = await models.remove_discord_subscription(ctx.user.id, **kwargs)
     if len(unsubbed_products) == 0:
         await respond(ctx, f"Couldn't find subscribed products with name {name}")
         return
@@ -140,7 +177,7 @@ async def notify(discord_id: int, product: models.Product):
         user = await bot.fetch_user(discord_id)
     except discord.NotFound:
         logger.exception(f"Couldn't find discord user id: {discord_id}")
-        await models.remove_discord_subscription_all(discord_id)
+        await models.remove_discord_subscription(discord_id)
         return
 
     try:
@@ -150,7 +187,7 @@ async def notify(discord_id: int, product: models.Product):
         return
 
     removed_subscription = await models.remove_discord_subscription(
-        discord_id, product.id
+        discord_id, id=product.id
     )
     if removed_subscription:
         await dm(user, f"Removed subscription to: {product}")
@@ -185,28 +222,19 @@ async def delete_product(
         int,
         default=-1,
         min_value=1,
-        description="Product id of the product to remove.",
+        description="Product id.",
     ),
     name: discord.Option(
         str,
         default="",
         autocomplete=get_product_names,
-        description="Product name of the product to remove.",
+        description="Product name.",
     ),
-    url: discord.Option(str, default="", description="Product URL to remove."),
-    indicator: discord.Option(
-        str, default="", description="Product indicator to remove."
-    ),
+    url: discord.Option(str, default="", description="Product URL."),
+    indicator: discord.Option(str, default="", description="Product indicator."),
 ):
-    kwargs = {}
-    if id > -1:
-        kwargs["id"] = id
-    if name != "":
-        kwargs["name"] = name
-    if url != "":
-        kwargs["url"] = url
-    if indicator != "":
-        kwargs["indicator"] = indicator
+    kwargs = dict(id=id, name=name, url=url, indicator=indicator)
+    filter_kwargs(kwargs)
 
     deleted_products = await models.delete_product(**kwargs)
     if len(deleted_products) == 0:

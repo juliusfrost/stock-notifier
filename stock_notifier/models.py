@@ -93,7 +93,7 @@ async def add_discord_user_if_not_exist(name: str, discord_id: int) -> User:
             return user
 
 
-async def add_discord_subscription(discord_id: int, product_name: str) -> List[Product]:
+async def add_discord_subscription(discord_id: int, **kwargs) -> List[Product]:
     """Adds a discord subscription. Returns a list of successfully subscribed products."""
     async with global_async_session() as session:
         async with session.begin():
@@ -102,7 +102,7 @@ async def add_discord_subscription(discord_id: int, product_name: str) -> List[P
             results = []
             for product in await session.scalars(
                 select(Product)
-                .where(Product.name == product_name)
+                .filter_by(**kwargs)
                 .filter(not_(Product.subscribers.any(User.id == user.id)))
                 .options(selectinload(Product.subscribers))
             ):
@@ -112,9 +112,7 @@ async def add_discord_subscription(discord_id: int, product_name: str) -> List[P
             return results
 
 
-async def remove_discord_subscription(
-    discord_id: int, product_id: int
-) -> Optional[Product]:
+async def remove_discord_subscription(discord_id: int, **kwargs) -> List[Product]:
     async with global_async_session() as session:
         async with session.begin():
             user = await session.scalar(
@@ -122,13 +120,16 @@ async def remove_discord_subscription(
                 .filter_by(discord_id=discord_id)
                 .options(selectinload(User.products))
             )
-            found = None
-            for product in user.products:
-                if product.id == product_id:
-                    found = product
-                    user.products.remove(product)
+            products_to_remove = []
+            for product in await session.scalars(
+                select(Product)
+                .filter_by(**kwargs)
+                .filter(Product.subscribers.any(User.id == user.id))
+            ):
+                user.products.remove(product)
+                products_to_remove.append(product)
             await session.flush()
-            return found
+            return products_to_remove
 
 
 async def remove_discord_subscription_all(
