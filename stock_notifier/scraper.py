@@ -14,8 +14,9 @@ from stock_notifier.logger import logger
 # Configuration
 sleep_seconds_config = config.get("sleep_seconds", {})
 SLEEP_SAME_HOST = sleep_seconds_config.get("same_host", 1)
-SLEEP_GLOBAL = sleep_seconds_config.get("global", 10)
-CONCURRENT_HOSTS_LIMIT = 5
+SLEEP_GLOBAL = sleep_seconds_config.get("global", 60)
+SLEEP_GLOBAL_JITTER = sleep_seconds_config.get("global_jitter", 10)
+CONCURRENT_HOSTS_LIMIT = config.get("concurrent_hosts_limit", 20)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0"
 )
@@ -112,6 +113,7 @@ async def scraper_loop():
         logger.info(
             f"Time spent checking stock: {round(time_spent_checking, 2)} seconds"
         )
-        sleep_time = max(SLEEP_GLOBAL - time_spent_checking, 0)
+        jitter = random.uniform(-SLEEP_GLOBAL_JITTER, SLEEP_GLOBAL_JITTER)
+        sleep_time = max(SLEEP_GLOBAL - time_spent_checking + jitter, 0)
         logger.info(f"Sleeping for {round(sleep_time, 2)} seconds...")
         await asyncio.sleep(sleep_time)

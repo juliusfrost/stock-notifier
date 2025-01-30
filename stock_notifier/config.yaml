@@ -1,3 +1,4 @@
 sleep_seconds:
   same_host: 2
   global: 60
+  global_jitter: 10
