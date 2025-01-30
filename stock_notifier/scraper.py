@@ -3,9 +3,11 @@ import random
 import re
 import time
 from collections import defaultdict
+from datetime import datetime
 from urllib.parse import urlparse
 
 import aiohttp
+import pytz
 
 from stock_notifier import config, models
 from stock_notifier.interface import notify
@@ -28,6 +30,17 @@ HEADERS = {
     "Connection": "keep-alive",
     "DNT": "1",
 }
+
+# Timezone configuration
+EASTERN_TZ = pytz.timezone("US/Eastern")
+WORK_HOURS_START = 8
+WORK_HOURS_END = 16
+
+
+def in_work_hours() -> bool:
+    """Check if current time is within work hours in Eastern Time"""
+    now = datetime.now(EASTERN_TZ)
+    return WORK_HOURS_START <= now.hour < WORK_HOURS_END
 
 
 async def get_html(url, session):
@@ -110,10 +123,19 @@ async def scraper_loop():
             logger.error(f"Error in main check cycle: {e}")
         finish_check_time = time.time()
         time_spent_checking = finish_check_time - start_check_time
-        logger.info(
-            f"Time spent checking stock: {round(time_spent_checking, 2)} seconds"
-        )
+
+        # Determine base sleep time based on work hours
+        if in_work_hours():
+            base_sleep = SLEEP_GLOBAL
+        else:
+            base_sleep = 2 * SLEEP_GLOBAL  # double sleep outside work hours
+
         jitter = random.uniform(-SLEEP_GLOBAL_JITTER, SLEEP_GLOBAL_JITTER)
-        sleep_time = max(SLEEP_GLOBAL - time_spent_checking + jitter, 0)
-        logger.info(f"Sleeping for {round(sleep_time, 2)} seconds...")
+        sleep_time = max(base_sleep - time_spent_checking + jitter, 0)
+
+        logger.info(
+            f"Time spent checking stock: {round(time_spent_checking, 2)} seconds\n"
+            f"Base sleep: {base_sleep}s, Jitter: {round(jitter, 2)}s\n"
+            f"Sleeping for {round(sleep_time, 2)} seconds..."
+        )
         await asyncio.sleep(sleep_time)
