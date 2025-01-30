@@ -4,7 +4,7 @@ import time
 from collections import defaultdict
 from urllib.parse import urlparse
 
-import requests
+import aiohttp
 
 from stock_notifier import config, models
 from stock_notifier.interface import notify
@@ -15,17 +15,21 @@ SLEEP_SAME_HOST = sleep_seconds_config.get("same_host", 1)
 SLEEP_GLOBAL = sleep_seconds_config.get("global", 10)
 
 
-def get_html(url):
-    response = requests.get(url)
-    return response.text
+async def get_html(url, session):
+    try:
+        async with session.get(url) as response:
+            return await response.text()
+    except Exception as e:
+        logger.error(f"Error fetching {url}: {e}")
+        raise
 
 
-async def check(product: models.Product):
+async def check(product: models.Product, session: aiohttp.ClientSession):
     logger.info(
         f"Checking {product.name} for indicator {product.indicator} at {product.url}"
     )
 
-    html = await asyncio.to_thread(get_html, product.url)
+    html = await get_html(product.url, session)
 
     if re.search(product.indicator, html, re.DOTALL):
         await notify(product)
@@ -36,12 +40,16 @@ async def get_products():
         return await session.scalars(models.select(models.Product))
 
 
-async def check_product_list(products: list[models.Product]):
-    for i, product in enumerate(products):
-        await check(product)
-        # sleep between checking products of the same host
-        if i < len(products) - 1:
-            await asyncio.sleep(SLEEP_SAME_HOST)
+async def check_product_list(host_products: list[models.Product]):
+    async with aiohttp.ClientSession() as session:
+        for i, product in enumerate(host_products):
+            try:
+                await check(product, session)
+                # Sleep between checking products of the same host
+                if i < len(host_products) - 1:
+                    await asyncio.sleep(SLEEP_SAME_HOST)
+            except Exception as e:
+                logger.error(f"Error checking product {product.name}: {e}")
 
 
 async def check_products():
@@ -52,8 +60,8 @@ async def check_products():
         hosts[o.hostname].append(p)
 
     tasks = []
-    for products in hosts.values():
-        tasks.append(asyncio.create_task(check_product_list(products)))
+    for host_products in hosts.values():
+        tasks.append(asyncio.create_task(check_product_list(host_products)))
 
     await asyncio.gather(*tasks)
 
