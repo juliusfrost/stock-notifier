@@ -11,10 +11,22 @@ from stock_notifier import config, models
 from stock_notifier.interface import notify
 from stock_notifier.logger import logger
 
+# Configuration
 sleep_seconds_config = config.get("sleep_seconds", {})
 SLEEP_SAME_HOST = sleep_seconds_config.get("same_host", 1)
 SLEEP_GLOBAL = sleep_seconds_config.get("global", 10)
-CONCURRENT_HOSTS_LIMIT = 5  # New configuration parameter
+CONCURRENT_HOSTS_LIMIT = 5
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0"
+)
+HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Connection": "keep-alive",
+    "DNT": "1",
+}
 
 
 async def get_html(url, session):
@@ -52,8 +64,11 @@ async def get_products():
 
 async def check_product_list(host_products: list[models.Product]):
     connector = aiohttp.TCPConnector(limit=5)
-    timeout = aiohttp.ClientTimeout(total=10)
-    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+    timeout = aiohttp.ClientTimeout(total=30)
+
+    async with aiohttp.ClientSession(
+        timeout=timeout, connector=connector, headers=HEADERS
+    ) as session:
         for i, product in enumerate(host_products):
             try:
                 await check(product, session)
